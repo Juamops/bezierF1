@@ -1,5 +1,20 @@
 import numpy as np
 from math import floor
+import matplotlib.pyplot as plt
+
+
+in_to_p = 404/16583
+m_to_in = 39.3701
+kmh_to_ms = 1/3.6
+kmh_to_p = kmh_to_ms * m_to_in * in_to_p
+
+
+def distance(p1, p2):
+    return (((p1.x - p2.x) ** 2) + ((p1.y - p2.y) ** 2)) ** 0.5
+
+
+def hypot(x, y):
+    return (x**2 + y**2)**0.5
 
 
 class Point:
@@ -133,6 +148,15 @@ class Spline:
 
         return t_point
 
+    def get_point_norm_m(self, t):
+        curve_index = floor(len(self.curves) * t) if floor(len(self.curves) * t) < len(self.curves) else len(self.curves) - 1
+        curve_t = len(self.curves) * t - curve_index
+        t_point = self.curves[curve_index].get_poly_point(curve_t)
+        t_point.x *= (1/in_to_p) * (1/m_to_in)
+        t_point.y *= (1 / in_to_p) * (1 / m_to_in)
+
+        return t_point
+
     def get_first_derivative_norm(self, t):
         curve_index = floor(len(self.curves) * t) if floor(len(self.curves) * t) < len(self.curves) else len(self.curves) - 1
         curve_t = len(self.curves) * t - curve_index
@@ -150,11 +174,17 @@ class Spline:
         return t_point
 
     def get_instant_radius_norm(self, t):
-        curve_index = floor(t) if t < len(self.curves) else len(self.curves) - 1
-        curve_t = t - curve_index
+        curve_index = floor(len(self.curves) * t) if floor(len(self.curves) * t) < len(self.curves) else len(self.curves) - 1
+        curve_t = len(self.curves) * t - curve_index
         r = self.curves[curve_index].get_instantaneous_radius(curve_t)
 
         return r
+
+    def get_max_vel(self, t, friction):
+        r = self.get_instant_radius_norm(t)
+        g = 9.81
+
+        return (r * g * friction)**0.5
 
     def get_points(self, start, end, n):
         x_coords = []
@@ -245,17 +275,19 @@ class Spline:
                 self.curves[i-1].cp2 = p1
                 curve.cp1 = p2
 
-    def distance(self, p1, p2):
-        return (((p1.x - p2.x)**2) + ((p1.y - p2.y)**2))**0.5
-
-    def step(self, origin, wanted_distance, step_size=0.0001):
+    def step(self, origin, wanted_distance, iter):
+        para_v = self.get_first_derivative_norm(origin)
+        v_mag = hypot(para_v.x, para_v.y) * len(self.curves)
+        est_dist = wanted_distance / v_mag
+        step_size = est_dist / 10000
         dist = 0
         t = origin
         while dist < wanted_distance:
             t += step_size
-            dist = self.distance(self.get_point_norm(origin), self.get_point_norm(t))
+            dist = distance(self.get_point_norm(origin), self.get_point_norm(t))
 
-        return t - (step_size / 2)
+        # plt.scatter(iter, distance(self.get_point_norm(origin), self.get_point_norm(t - (step_size / 2))), color='g')
+        return t - (step_size / 2), distance(self.get_point_norm(origin), self.get_point_norm(t - (step_size / 2)))
 
     def length(self, velocity):
         vals, tot_time = self.traverse_const_vel(0, 1, velocity)
@@ -267,11 +299,18 @@ class Spline:
         t_vals = [t]
         dist = velocity * timestep
         total_time = [0]
+        iter = 0
+        dists = []
         while t < end:
-            t = self.step(t, dist)
+            t, real_dist = self.step(t, dist, iter)
+            dists.append(real_dist)
             t_vals.append(t)
             total_time.append(total_time[-1] + timestep)
-        return t_vals, total_time
+            iter += 1
+
+        # plt.plot([0, iter], [dist, dist])
+        # plt.show()
+        return t_vals, total_time, dists
 
     def traverse_fv_constraint(self, start, end, f_coefficient, max_vel, timestep=0.01):
         t = start
@@ -282,12 +321,13 @@ class Spline:
 
         t_vals = [t]
         total_time = [0]
+        iter = 0
 
         while t < end:
-            t = self.step(t, dist)
             tan_vmax = (f_coefficient * g * self.get_instant_radius_norm(t))**0.5
             velocity = min(max_vel, tan_vmax)
             dist = velocity * timestep
+            t, d = self.step(t, dist, iter)
             total_time.append(total_time[-1] + timestep)
             t_vals.append(t)
 
@@ -317,3 +357,48 @@ class Spline:
         for curve in self.curves:
             print(curve.make_string() + ',')
         print('])')
+
+    def get_movement_vectors(self, t_vals, time_vals, timestep=0.01):
+        look_forward = 1
+        vel_x = []
+        vel_y = []
+        for i in range(len(t_vals) - look_forward):
+            p1 = self.get_point_norm(t_vals[i])
+            p2 = self.get_point_norm(t_vals[i+look_forward])
+            vx = (p2.x - p1.x) / (time_vals[i+look_forward] - time_vals[i])
+            vy = (p2.y - p1.y) / (time_vals[i+look_forward] - time_vals[i])
+            vx *= (1/in_to_p) * (1/m_to_in) * 3.6
+            vy *= (1 / in_to_p) * (1 / m_to_in) * 3.6
+            vel_x.append(vx)
+            vel_y.append(vy)
+
+        for k in range(look_forward):
+            vel_x.append(vel_x[-1])
+            vel_y.append(vel_y[-1])
+
+        look_forward = 1
+        acc_x = []
+        acc_y = []
+        for i in range(len(t_vals) - look_forward):
+            # point = self.get_second_derivative_norm(t_vals[i])
+            # magnitude = (point.x**2 + point.y**2)**0.5
+            # point.x = point.x / magnitude
+            # point.y = point.y / magnitude
+            #
+            # r = self.get_instant_radius_norm(t_vals[i])
+            # new_mag = (vel_x[i]**2 + vel_y[i]**2) / r
+            # point.x = point.x * new_mag
+            # point.y = point.y * new_mag
+            #
+            # acc_x.append(point.x)
+            # acc_y.append(point.y)
+
+            acc_y.append((vel_y[i+look_forward] - vel_y[i]) / (time_vals[i+look_forward] - time_vals[i]))
+            acc_x.append((vel_x[i+look_forward] - vel_x[i]) / (time_vals[i+look_forward] - time_vals[i]))
+
+        for k in range(look_forward):
+            acc_x.append(acc_x[0])
+            acc_y.append(acc_y[0])
+
+        return vel_x, vel_y, acc_x, acc_y
+

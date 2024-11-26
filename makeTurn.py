@@ -6,7 +6,7 @@ from PIL import Image
 
 lower_track = [
     Point(571, 508),
-    Point(564, 528),
+    Point(562, 543),
     Point(554, 552),
     Point(537, 576),
     Point(516, 596),
@@ -17,9 +17,9 @@ lower_track = [
     Point(386, 650),
     Point(361, 656),
     Point(329, 659),
-    Point(308, 659),
-    Point(287, 657),
-    Point(267, 641),
+    Point(308, 660),
+    Point(287, 655),
+    Point(263, 646),
     Point(251, 626)
 ]
 
@@ -35,10 +35,10 @@ upper_track = [
 ]
 
 new_curve = Bezier(
-    Point(550, 380),
-    Point(555, 350),
-    Point(608, 317),
-    Point(620, 280)
+    Point(563, 380),
+    Point(567, 350),
+    Point(600, 305),
+    Point(610, 280)
 )
 
 lower_track = list(reversed(lower_track))
@@ -65,15 +65,15 @@ lower_spline.add_curve(new_curve)
 lower_spline.join_with(upper_spline)
 lower_spline.make_continuous()
 
-# track = np.asarray(Image.open('track.png'))
-# plt.imshow(track)
+track = np.asarray(Image.open('track.png'))
+plt.imshow(track)
 
 x_lower, y_lower = lower_spline.get_points(0, 1, 500)
 x_control, y_control = lower_spline.get_control_points()
-# plt.plot(x_lower, y_lower, lw=3)
-# plt.scatter(x_control, y_control, color='r')
-x_d, y_d = lower_spline.get_first_derivatives(0, 0.5, 500)
-plt.plot(x_d, y_d)
+plt.plot(x_lower, y_lower, lw=3)
+plt.scatter(x_control, y_control, color='r')
+# x_d, y_d = lower_spline.get_first_derivatives(0, 0.5, 500)
+# plt.plot(x_d, y_d)
+# lower_spline.print_spline()
 lower_spline.print_spline()
-
 plt.show()

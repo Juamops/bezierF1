@@ -6,7 +6,7 @@ from PIL import Image
 
 lower_track = [
     Point(571, 508),
-    Point(564, 528),
+    Point(568, 528),
     Point(554, 552),
     Point(537, 576),
     Point(516, 596),
@@ -58,5 +58,8 @@ lower_spline.join_with(upper_spline)
 track = np.asarray(Image.open('track.png'))
 plt.imshow(track)
 x_lower, y_lower = lower_spline.get_points(0, 1, 500)
+x_control, y_control = lower_spline.get_control_points()
+
 plt.plot(x_lower, y_lower, lw=3)
+plt.scatter(x_control, y_control, color='m')
 plt.show()
