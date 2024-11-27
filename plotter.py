@@ -117,6 +117,9 @@ for i in range(1, len(upper_track)-1, 3):
 lower_spline = Spline(lower_curves)
 upper_spline = Spline(upper_curves)
 
+print(len(lower_spline.curves))
+print(len(upper_spline.curves))
+
 lower_spline.make_continuous()
 upper_spline.make_continuous()
 x_control, y_control = upper_spline.get_control_lines()

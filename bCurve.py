@@ -182,6 +182,7 @@ class Spline:
 
     def get_max_vel(self, t, friction):
         r = self.get_instant_radius_norm(t)
+        r *= (16583/404) * (1/39.3701)
         g = 9.81
 
         return (r * g * friction)**0.5
@@ -268,12 +269,21 @@ class Spline:
 
         return Point(x1, y1), Point(x2, y2)
 
-    def make_continuous(self):
-        for i, curve in enumerate(self.curves):
-            if i > 0:
-                p1, p2 = self.get_best_control_line(curve.start, self.curves[i-1].cp2, curve.cp1)
-                self.curves[i-1].cp2 = p1
-                curve.cp1 = p2
+    def make_continuous(self, inplace=True):
+        if inplace:
+            for i, curve in enumerate(self.curves):
+                if i > 0:
+                    p1, p2 = self.get_best_control_line(curve.start, self.curves[i-1].cp2, curve.cp1)
+                    self.curves[i-1].cp2 = p1
+                    curve.cp1 = p2
+        else:
+            new_spline = Spline(self.curves.copy())
+            for i, curve in enumerate(new_spline.curves):
+                if i > 0:
+                    p1, p2 = new_spline.get_best_control_line(curve.start, new_spline.curves[i-1].cp2, curve.cp1)
+                    new_spline.curves[i-1].cp2 = p1
+                    curve.cp1 = p2
+            return new_spline
 
     def step(self, origin, wanted_distance, iter):
         para_v = self.get_first_derivative_norm(origin)
@@ -367,8 +377,8 @@ class Spline:
             p2 = self.get_point_norm(t_vals[i+look_forward])
             vx = (p2.x - p1.x) / (time_vals[i+look_forward] - time_vals[i])
             vy = (p2.y - p1.y) / (time_vals[i+look_forward] - time_vals[i])
-            vx *= (1/in_to_p) * (1/m_to_in) * 3.6
-            vy *= (1 / in_to_p) * (1 / m_to_in) * 3.6
+            vx *= (1/in_to_p) * (1/m_to_in)
+            vy *= (1 / in_to_p) * (1 / m_to_in)
             vel_x.append(vx)
             vel_y.append(vy)
 
@@ -379,6 +389,7 @@ class Spline:
         look_forward = 1
         acc_x = []
         acc_y = []
+
         for i in range(len(t_vals) - look_forward):
             # point = self.get_second_derivative_norm(t_vals[i])
             # magnitude = (point.x**2 + point.y**2)**0.5
